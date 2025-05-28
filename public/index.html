@@ -4,23 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="styles/padrao.css">
-    <title>Jogo da Velha</title>
+    <title>Usuario</title>
 </head>
 <body>
-    <div class="jogo">
-        <h1>Jogo da Velha</h1>
-        <div class="board">
-            <div class="cell" data-cell></div>
-            <div class="cell" data-cell></div>
-            <div class="cell" data-cell></div>
-            <div class="cell" data-cell></div>
-            <div class="cell" data-cell></div>
-            <div class="cell" data-cell></div>
-            <div class="cell" data-cell></div>
-            <div class="cell" data-cell></div>
-            <div class="cell" data-cell></div>
-        </div>
-        <button class="btn-reiniciar">Reiniciar</button>
+    <h1>Jogo da Velha</h1>
+    <div class="formulario">
+        <form action="/usuario" method="POST">
+            <label for="nome-str">Escreva seu Nome</label>
+            <input type="text" id="nome-str" name="nome-str" required>
+            <button type="submit">Enviar</button>
+        </form>
     </div>
 </body>
 </html>
