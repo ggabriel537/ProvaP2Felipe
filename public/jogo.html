@@ -36,5 +36,46 @@
             </div>
         </div>
     </div>
+<script>
+    document.querySelector('.btn-sair').addEventListener('click', () => {
+        socket.close();
+        document.body.innerHTML = '';
+    });
+
+    document.querySelector('.btn-reiniciar').addEventListener('click', () => {
+        celulas.forEach(cell => {
+            cell.textContent = '';
+            cell.classList.remove('marcado');
+        });
+        jogadorAtual = 'X';
+        jogoAtivo = true;
+        socket.send(JSON.stringify({ action: 'reiniciar' }));
+    });
+    const socket = new WebSocket('ws://localhost:8080');
+    const celulas = document.querySelectorAll('[data-cell]');
+    let jogadorAtual = 'X';
+    let jogoAtivo = true;
+
+    socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        const cell = celulas[data.index];
+        cell.textContent = data.jogador;
+        cell.classList.add('marcado');
+        jogadorAtual = data.jogador === 'X' ? 'O' : 'X';
+        jogoAtivo = true;
+    };
+
+    celulas.forEach((cell, index) => {
+        cell.addEventListener('click', () => {
+            if (cell.classList.contains('marcado') || !jogoAtivo) return;
+
+            cell.textContent = jogadorAtual;
+            cell.classList.add('marcado');
+            jogoAtivo = false;
+
+            socket.send(JSON.stringify({ index: index, jogador: jogadorAtual }));
+        });
+    });
+</script>
 </body>
 </html>
