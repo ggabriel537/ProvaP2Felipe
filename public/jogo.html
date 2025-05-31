@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -36,45 +36,97 @@
             </div>
         </div>
     </div>
-<script>
-    document.querySelector('.btn-sair').addEventListener('click', () => {
-        socket.close();
-        document.body.innerHTML = '';
-    });
 
-    document.querySelector('.btn-reiniciar').addEventListener('click', () => {
-        celulas.forEach(cell => {
-            cell.textContent = '';
-            cell.classList.remove('marcado');
-        });
-        jogadorAtual = 'X';
-        jogoAtivo = true;
-        socket.send(JSON.stringify({ action: 'reiniciar' }));
-    });
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const nomeUsuario = urlParams.get('nome');
+
     const socket = new WebSocket('ws://localhost:8080');
     const celulas = document.querySelectorAll('[data-cell]');
     let jogadorAtual = 'X';
     let jogoAtivo = true;
 
-    socket.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        const cell = celulas[data.index];
-        cell.textContent = data.jogador;
-        cell.classList.add('marcado');
-        jogadorAtual = data.jogador === 'X' ? 'O' : 'X';
-        jogoAtivo = true;
-    };
+    let meuId = null;
+    let meuSimbolo = null;
 
-    celulas.forEach((cell, index) => {
-        cell.addEventListener('click', () => {
-            if (cell.classList.contains('marcado') || !jogoAtivo) return;
+    socket.addEventListener('open', () => {
+        socket.send(JSON.stringify({ acao: 'alterarNome', nome: nomeUsuario }));
+    });
 
-            cell.textContent = jogadorAtual;
-            cell.classList.add('marcado');
-            jogoAtivo = false;
+    socket.addEventListener('message', (event) => {
+    const dados = JSON.parse(event.data);
 
-            socket.send(JSON.stringify({ index: index, jogador: jogadorAtual }));
+    if (dados.acao === 'atribuirNome') {
+        meuId = dados.nome;
+        meuSimbolo = meuId === 'Jogador 1' ? 'X' : 'O';
+    }
+
+    if (dados.acao === 'atualizarNome') {
+        const elemento = document.getElementById(dados.chaveJogador);
+        if (elemento) {
+            elemento.textContent = dados.nome;
+        }
+    }
+
+    if (dados.acao === 'avisoJogadorSaiu') {
+        let elemento = null;
+        if (dados.chaveJogador === 'jogador1') {
+            elemento = document.getElementById('p1');
+        } else {
+            elemento = document.getElementById('p2');
+        }
+        if (elemento) {
+            alert(`${elemento.textContent} saiu do jogo.`);
+            elemento.textContent = 'Aguardando...';
+        }
+        socket.send(JSON.stringify({ acao: 'reiniciar' }));
+    }
+
+    if (dados.acao === 'reiniciar') {
+        celulas.forEach(celula => {
+            celula.textContent = '';
+            celula.classList.remove('marcado');
         });
+        jogadorAtual = 'X';
+        jogoAtivo = true;
+    }
+
+    if (dados.indice !== undefined && dados.jogador) {
+        const celula = celulas[dados.indice];
+        celula.textContent = dados.jogador;
+        celula.classList.add('marcado');
+        jogadorAtual = dados.jogador === 'X' ? 'O' : 'X';
+        jogoAtivo = true;
+    }
+
+    if (dados.acao === 'atualizarTurno') {
+        jogadorAtual = dados.turnoJogador;
+    }
+});
+
+
+    celulas.forEach((celula, indice) => {
+        celula.addEventListener('click', () => {
+            if (celula.classList.contains('marcado') || !jogoAtivo) return;
+            if (meuSimbolo !== jogadorAtual) {
+                alert("Não é sua vez!");
+                return;
+            }
+            celula.textContent = meuSimbolo;
+            celula.classList.add('marcado');
+            jogoAtivo = false;
+            socket.send(JSON.stringify({ indice: indice, jogador: meuSimbolo }));
+        });
+    });
+
+    document.querySelector('.btn-reiniciar').addEventListener('click', () => {
+        socket.send(JSON.stringify({ acao: 'reiniciar' }));
+    });
+
+    document.querySelector('.btn-sair').addEventListener('click', () => {
+        socket.send(JSON.stringify({ acao: 'sair' }));
+        socket.close();
+        document.body.innerHTML = '<h1>Você saiu do jogo.</h1>';
     });
 </script>
 </body>
