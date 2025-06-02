@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="styles/padrao.css">
     <title>Jogo da Velha</title>
 </head>
+
 <body>
     <div class="jogo">
         <h1>Jogo da Velha</h1>
@@ -37,97 +39,109 @@
         </div>
     </div>
 
-<script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const nomeUsuario = urlParams.get('nome');
+    <script>
+        const url_params = new URLSearchParams(window.location.search);
+        const nome_usuario = url_params.get('nome');
+        const socket = new WebSocket('ws://localhost:8080');
+        const celulas = document.querySelectorAll('[data-cell]');
+        const botao_reiniciar = document.querySelector('.btn-reiniciar');
+        let id = null;
+        let simbolo = null;
+        let jogador_atual = null;
+        let jogo_ativo = true;
 
-    const socket = new WebSocket('ws://localhost:8080');
-    const celulas = document.querySelectorAll('[data-cell]');
-    let jogadorAtual = 'X';
-    let jogoAtivo = true;
-
-    let meuId = null;
-    let meuSimbolo = null;
-
-    socket.addEventListener('open', () => {
-        socket.send(JSON.stringify({ acao: 'alterarNome', nome: nomeUsuario }));
-    });
-
-    socket.addEventListener('message', (event) => {
-    const dados = JSON.parse(event.data);
-
-    if (dados.acao === 'atribuirNome') {
-        meuId = dados.nome;
-        meuSimbolo = meuId === 'Jogador 1' ? 'X' : 'O';
-    }
-
-    if (dados.acao === 'atualizarNome') {
-        const elemento = document.getElementById(dados.chaveJogador);
-        if (elemento) {
-            elemento.textContent = dados.nome;
-        }
-    }
-
-    if (dados.acao === 'avisoJogadorSaiu') {
-        let elemento = null;
-        if (dados.chaveJogador === 'jogador1') {
-            elemento = document.getElementById('p1');
-        } else {
-            elemento = document.getElementById('p2');
-        }
-        if (elemento) {
-            alert(`${elemento.textContent} saiu do jogo.`);
-            elemento.textContent = 'Aguardando...';
-        }
-        socket.send(JSON.stringify({ acao: 'reiniciar' }));
-    }
-
-    if (dados.acao === 'reiniciar') {
-        celulas.forEach(celula => {
-            celula.textContent = '';
-            celula.classList.remove('marcado');
+        socket.addEventListener('open', () => {
+            socket.send(JSON.stringify({ acao: 'alterarNome', nome: nome_usuario }));
         });
-        jogadorAtual = 'X';
-        jogoAtivo = true;
-    }
 
-    if (dados.indice !== undefined && dados.jogador) {
-        const celula = celulas[dados.indice];
-        celula.textContent = dados.jogador;
-        celula.classList.add('marcado');
-        jogadorAtual = dados.jogador === 'X' ? 'O' : 'X';
-        jogoAtivo = true;
-    }
+        socket.addEventListener('message', (event) => {
+            const dados = JSON.parse(event.data);
 
-    if (dados.acao === 'atualizarTurno') {
-        jogadorAtual = dados.turnoJogador;
-    }
-});
-
-
-    celulas.forEach((celula, indice) => {
-        celula.addEventListener('click', () => {
-            if (celula.classList.contains('marcado') || !jogoAtivo) return;
-            if (meuSimbolo !== jogadorAtual) {
-                alert("Não é sua vez!");
-                return;
+            if (dados.acao === 'atribuirNome') {
+                id = dados.nome;
+                simbolo = id === 'Jogador 1' ? 'X' : 'O';
             }
-            celula.textContent = meuSimbolo;
-            celula.classList.add('marcado');
-            jogoAtivo = false;
-            socket.send(JSON.stringify({ indice: indice, jogador: meuSimbolo }));
+
+            if (dados.acao === 'atualizarNome') {
+                const elemento = document.getElementById(dados.chaveJogador);
+                if (elemento) elemento.textContent = dados.nome;
+            }
+
+            if (dados.acao === 'avisoJogadorSaiu') {
+                const elemento = document.getElementById(dados.chaveJogador);
+                if (elemento) elemento.textContent = 'Aguardando...';
+            }
+
+            if (dados.acao === 'passarVez') {
+                jogador_atual = dados.jogador === 'Jogador 1' ? 'X' : 'O';
+                alert(`${dados.jogador} perdeu a conexão. Agora é sua vez!`);
+            }
+
+            if (dados.acao === 'reiniciar') {
+                celulas.forEach(celula => {
+                    celula.textContent = '';
+                    celula.classList.remove('marcado');
+                });
+                jogo_ativo = true;
+            }
+
+            if (dados.indice !== undefined && dados.jogador) {
+                const celula = celulas[dados.indice];
+                celula.textContent = dados.jogador;
+                celula.classList.add('marcado');
+            }
+
+            if (dados.acao === 'estadoAtual') {
+                dados.tabuleiro.forEach((valor, indice) => {
+                    if (valor) {
+                        celulas[indice].textContent = valor;
+                        celulas[indice].classList.add('marcado');
+                    }
+                });
+                jogador_atual = dados.turnoJogador;
+            }
+
+            if (dados.acao === 'atualizarTurno') {
+                jogador_atual = dados.turnoJogador;
+            }
+
+            if (dados.acao === 'fimDeJogo') {
+                alert(dados.mensagem);
+                jogo_ativo = false;
+                botao_reiniciar.style.display = 'block';
+            }
+
+            if (dados.acao === 'ocultarBotao') {
+                botao_reiniciar.style.display = 'none';
+            }
         });
-    });
 
-    document.querySelector('.btn-reiniciar').addEventListener('click', () => {
-        socket.send(JSON.stringify({ acao: 'reiniciar' }));
-    });
+        celulas.forEach((celula, indice) => {
+            celula.addEventListener('click', () => {
+                if (celula.classList.contains('marcado') || !jogo_ativo) return;
+                if (simbolo !== jogador_atual) {
+                    alert("Não é sua vez!");
+                    return;
+                }
+                socket.send(JSON.stringify({ indice }));
+            });
+        });
 
-    document.querySelector('.btn-sair').addEventListener('click', () => {
-        socket.send(JSON.stringify({ acao: 'sair' }));
-        socket.close();
-        document.body.innerHTML = '<h1>Você saiu do jogo.</h1>';
-    });
-</script>
+        botao_reiniciar.addEventListener('click', () => {
+            socket.send(JSON.stringify({ acao: 'reiniciar' }));
+        });
+
+        document.querySelector('.btn-sair').addEventListener('click', () => {
+            socket.send(JSON.stringify({ acao: 'sair' }));
+            socket.close();
+            document.body.innerHTML = '<h1>Você saiu do jogo.</h1>';
+        });
+
+        botao_reiniciar.style.display = 'none';
+    </script>
+
+
+
 </body>
+
 </html>

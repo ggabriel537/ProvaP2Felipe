@@ -2,134 +2,158 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 
-const aplicativo = express();
-const servidorHttp = http.createServer(aplicativo);
-const servidorWs = new WebSocket.Server({ server: servidorHttp });
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
 
-let turnoJogador = 'X';
+let turno_jogador = 'X';
 let tabuleiro = Array(9).fill(null);
-let listaJogadores = {};
+let lista_jogadores = {
+    'Jogador 1': { conexao: null, nome: 'Aguardando...' },
+    'Jogador 2': { conexao: null, nome: 'Aguardando...' }
+};
 
-aplicativo.use(express.static('public'));
-aplicativo.use(express.urlencoded({ extended: true }));
+function verificarVencedor() {
+    const combinacoes = [
+        [0,1,2],[3,4,5],[6,7,8],
+        [0,3,6],[1,4,7],[2,5,8],
+        [0,4,8],[2,4,6]
+    ];
+    for (const [a, b, c] of combinacoes) {
+        if (tabuleiro[a] && tabuleiro[a] === tabuleiro[b] && tabuleiro[a] === tabuleiro[c]) {
+            return tabuleiro[a];
+        }
+    }
+    return tabuleiro.every(c => c !== null) ? 'Empate' : null;
+}
 
-aplicativo.get('/', (requisicao, resposta) => {
-    resposta.sendFile(__dirname + '/index.html');
+app.use(express.static('public'));
+app.use(express.urlencoded({ extended: true }));
+
+app.get('/', (req, res) => {
+    res.sendFile(__dirname + '/index.html');
 });
 
-aplicativo.post('/usuario', (requisicao, resposta) => {
-    const nome = requisicao.body['nome-str'];
-    if (!nome) {
-        return resposta.status(400).send('Nome é obrigatório');
-    }
-    resposta.redirect(`/jogo.html?nome=${encodeURIComponent(nome)}`);
+app.post('/usuario', (req, res) => {
+    const nome = req.body['nome-str'];
+    if (!nome) return res.status(400).send('Nome é obrigatório');
+    res.redirect(`/jogo.html?nome=${encodeURIComponent(nome)}`);
 });
 
-servidorWs.on('connection', (conexao) => {
-    if (Object.keys(listaJogadores).length >= 2) {
-        conexao.close(1000, 'Máximo de jogadores atingido');
-        return;
-    }
+wss.on('connection', (conn) => {
+    let id_jogador = null;
 
-    let idJogador;
-    if (Object.keys(listaJogadores).length === 0) {
-        idJogador = 'Jogador 1';
-    } else {
-        idJogador = 'Jogador 2';
-    }
-
-    listaJogadores[idJogador] = { conexao: conexao, nome: null };
-
-    conexao.send(JSON.stringify({ acao: 'atribuirNome', nome: idJogador }));
-
-    for (const [id, info] of Object.entries(listaJogadores)) {
-        if (info.nome) {
-            const chaveJogador = id === 'Jogador 1' ? 'p1' : 'p2';
-            conexao.send(JSON.stringify({
-                acao: 'atualizarNome',
-                chaveJogador,
-                nome: info.nome
-            }));
+    for (const id in lista_jogadores) {
+        if (!lista_jogadores[id].conexao) {
+            id_jogador = id;
+            lista_jogadores[id].conexao = conn;
+            break;
         }
     }
 
-    conexao.send(JSON.stringify({
-        acao: 'estadoAtual',
-        tabuleiro,
-        turnoJogador
-    }));
+    if (!id_jogador) {
+        conn.close(1000, 'Máximo de jogadores atingido');
+        return;
+    }
 
-    conexao.on('message', (mensagem) => {
-        const dados = JSON.parse(mensagem);
+    conn.send(JSON.stringify({ acao: 'atribuirNome', nome: id_jogador }));
+
+    for (const id in lista_jogadores) {
+        const chave_jogador = id === 'Jogador 1' ? 'p1' : 'p2';
+        conn.send(JSON.stringify({ acao: 'atualizarNome', chaveJogador: chave_jogador, nome: lista_jogadores[id].nome }));
+    }
+
+    conn.send(JSON.stringify({ acao: 'estadoAtual', tabuleiro, turnoJogador: turno_jogador }));
+
+    conn.on('message', (msg) => {
+        const dados = JSON.parse(msg);
 
         if (dados.acao === 'alterarNome') {
-            const chaveJogador = idJogador === 'Jogador 1' ? 'p1' : 'p2';
-            listaJogadores[idJogador].nome = dados.nome;
-            servidorWs.clients.forEach((cliente) => {
+            const chave_jogador = id_jogador === 'Jogador 1' ? 'p1' : 'p2';
+            lista_jogadores[id_jogador].nome = dados.nome;
+            wss.clients.forEach((cliente) => {
                 if (cliente.readyState === WebSocket.OPEN) {
-                    cliente.send(JSON.stringify({ acao: 'atualizarNome', chaveJogador, nome: dados.nome }));
+                    cliente.send(JSON.stringify({ acao: 'atualizarNome', chaveJogador: chave_jogador, nome: dados.nome }));
                 }
             });
         }
 
         if (dados.acao === 'reiniciar') {
             tabuleiro = Array(9).fill(null);
-            turnoJogador = 'X';
-            servidorWs.clients.forEach((cliente) => {
+            turno_jogador = 'X';
+            wss.clients.forEach((cliente) => {
                 if (cliente.readyState === WebSocket.OPEN) {
                     cliente.send(JSON.stringify({ acao: 'reiniciar' }));
+                    cliente.send(JSON.stringify({ acao: 'atualizarTurno', turnoJogador: turno_jogador }));
+                    cliente.send(JSON.stringify({ acao: 'ocultarBotao' }));
                 }
             });
         }
 
         if (dados.acao === 'sair') {
-            const nome = listaJogadores[idJogador]?.nome;
-            listaJogadores[idJogador].conexao.close();
-            delete listaJogadores[idJogador];
-
-            if (Object.keys(listaJogadores).length === 1) {
-                turnoJogador = Object.keys(listaJogadores)[0] === 'Jogador 1' ? 'X' : 'O';
+            conn.close();
         }
 
-        servidorWs.clients.forEach((cliente) => {
-            if (cliente.readyState === WebSocket.OPEN) {
-            cliente.send(JSON.stringify({
-                acao: 'avisoJogadorSaiu',
-                chaveJogador: nome,
-                jogadorId: idJogador
-            }));
-
-            cliente.send(JSON.stringify({
-                acao: 'atualizarTurno',
-                turnoJogador: turnoJogador
-            }));
-        }
-    });
-}
-
-
-        if (dados.indice !== undefined && dados.jogador !== undefined) {
-            const indice = dados.indice;
-            const jogador = dados.jogador;
-
-            if (tabuleiro[indice] === null && jogador === turnoJogador) {
-                tabuleiro[indice] = jogador;
-                servidorWs.clients.forEach((cliente) => {
-                    if (cliente.readyState === WebSocket.OPEN) {
-                        cliente.send(JSON.stringify({ indice, jogador }));
+        if (dados.indice !== undefined) {
+            if (lista_jogadores[id_jogador]) {
+                const simbolo = id_jogador === 'Jogador 1' ? 'X' : 'O';
+                if (tabuleiro[dados.indice] === null && simbolo === turno_jogador) {
+                    tabuleiro[dados.indice] = simbolo;
+                    wss.clients.forEach((cliente) => {
+                        if (cliente.readyState === WebSocket.OPEN) {
+                            cliente.send(JSON.stringify({ indice: dados.indice, jogador: simbolo }));
+                        }
+                    });
+                    const resultado = verificarVencedor();
+                    if (resultado) {
+                        const mensagem = resultado === 'Empate' ? 'Empate!' : `Jogador ${simbolo} venceu!`;
+                        wss.clients.forEach((cliente) => {
+                            if (cliente.readyState === WebSocket.OPEN) {
+                                cliente.send(JSON.stringify({ acao: 'fimDeJogo', mensagem }));
+                            }
+                        });
+                    } else {
+                        turno_jogador = turno_jogador === 'X' ? 'O' : 'X';
+                        wss.clients.forEach((cliente) => {
+                            if (cliente.readyState === WebSocket.OPEN) {
+                                cliente.send(JSON.stringify({ acao: 'atualizarTurno', turnoJogador: turno_jogador }));
+                            }
+                        });
                     }
-                });
-                turnoJogador = turnoJogador === 'X' ? 'O' : 'X';
+                }
             }
         }
     });
 
-    conexao.on('close', () => {
-        delete listaJogadores[idJogador];
-        console.log(`${idJogador} desconectado`);
+    conn.on('close', () => {
+        if (id_jogador) {
+            lista_jogadores[id_jogador].conexao = null;
+            lista_jogadores[id_jogador].nome = 'Aguardando...';
+            const chave_jogador = id_jogador === 'Jogador 1' ? 'p1' : 'p2';
+            wss.clients.forEach((cliente) => {
+                if (cliente.readyState === WebSocket.OPEN) {
+                    cliente.send(JSON.stringify({ acao: 'atualizarNome', chaveJogador: chave_jogador, nome: 'Aguardando...' }));
+                    cliente.send(JSON.stringify({ acao: 'avisoJogadorSaiu', chaveJogador: chave_jogador }));
+                    if (id_jogador === 'Jogador 1' && lista_jogadores['Jogador 2'].conexao) {
+                        cliente.send(JSON.stringify({ acao: 'passarVez', jogador: 'Jogador 2' }));
+                        turno_jogador = 'O';
+                    } else if (id_jogador === 'Jogador 2' && lista_jogadores['Jogador 1'].conexao) {
+                        cliente.send(JSON.stringify({ acao: 'passarVez', jogador: 'Jogador 1' }));
+                        turno_jogador = 'X';
+                    }
+                }
+            });
+            tabuleiro = Array(9).fill(null);
+            wss.clients.forEach((cliente) => {
+                if (cliente.readyState === WebSocket.OPEN) {
+                    cliente.send(JSON.stringify({ acao: 'reiniciar' }));
+                    cliente.send(JSON.stringify({ acao: 'atualizarTurno', turnoJogador: turno_jogador }));
+                }
+            });
+        }
     });
 });
 
-servidorHttp.listen(8080, () => {
+server.listen(8080, () => {
     console.log('Servidor está rodando em http://localhost:8080');
 });
