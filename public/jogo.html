@@ -1,13 +1,11 @@
 <!DOCTYPE html>
 <html lang="pt-br">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="styles/padrao.css">
     <title>Jogo da Velha</title>
 </head>
-
 <body>
     <div class="jogo">
         <h1>Jogo da Velha</h1>
@@ -119,7 +117,11 @@
             }
 
             if (dados.acao === 'fimDeJogo') {
-                alert(`${dados.nomeVencedor} venceu!`);
+                if (dados.nomeVencedor === 'Empate') {
+                    alert('Jogo empatou!');
+                } else {
+                    alert(`${dados.nomeVencedor} venceu!`);
+                }
                 jogo_ativo = false;
                 botao_reiniciar.style.display = 'block';
             }
@@ -157,9 +159,5 @@
             window.location.href = '/';
         });
     </script>
-
-
-
 </body>
-
 </html>

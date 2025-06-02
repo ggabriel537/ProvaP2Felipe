@@ -95,7 +95,7 @@ wss.on('connection', (conn) => {
             conn.close();
         }
 
-        if (dados.indice !== undefined) {
+        if (dados.acao === 'alterarJogada' && dados.indice !== undefined) {
             if (lista_jogadores[id_jogador]) {
                 const simbolo = id_jogador === 'Jogador 1' ? 'X' : 'O';
                 if (tabuleiro[dados.indice] === null && simbolo === turno_jogador) {
@@ -122,12 +122,8 @@ wss.on('connection', (conn) => {
 
                         wss.clients.forEach((cliente) => {
                             if (cliente.readyState === WebSocket.OPEN) {
-                                wss.clients.forEach((cliente) => {
-                                    if (cliente.readyState === WebSocket.OPEN) {
-                                        cliente.send(JSON.stringify({ acao: 'atualizarContadores', chaveJogador: 'p1', vitorias: lista_jogadores['Jogador 1'].vitorias, jogos: lista_jogadores['Jogador 1'].jogos }));
-                                        cliente.send(JSON.stringify({ acao: 'atualizarContadores', chaveJogador: 'p2', vitorias: lista_jogadores['Jogador 2'].vitorias, jogos: lista_jogadores['Jogador 2'].jogos }));
-                                    }
-                                });
+                                cliente.send(JSON.stringify({ acao: 'atualizarContadores', chaveJogador: 'p1', vitorias: lista_jogadores['Jogador 1'].vitorias, jogos: lista_jogadores['Jogador 1'].jogos }));
+                                cliente.send(JSON.stringify({ acao: 'atualizarContadores', chaveJogador: 'p2', vitorias: lista_jogadores['Jogador 2'].vitorias, jogos: lista_jogadores['Jogador 2'].jogos }));
                             }
                         });
                     } else {
