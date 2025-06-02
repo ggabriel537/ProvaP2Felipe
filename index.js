@@ -107,10 +107,10 @@ wss.on('connection', (conn) => {
                     });
                     const resultado = verificarVencedor();
                     if (resultado) {
-                        const mensagem = resultado === 'Empate' ? 'Empate!' : `Jogador ${simbolo} venceu!`;
+                        const vencedor = resultado === 'Empate' ? 'Empate' : lista_jogadores[id_jogador].nome;
                         wss.clients.forEach((cliente) => {
                             if (cliente.readyState === WebSocket.OPEN) {
-                                cliente.send(JSON.stringify({ acao: 'fimDeJogo', mensagem }));
+                                cliente.send(JSON.stringify({ acao: 'fimDeJogo', nomeVencedor: vencedor }));
                             }
                         });
 
