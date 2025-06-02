@@ -22,21 +22,24 @@
             <div class="cell" data-cell></div>
             <div class="cell" data-cell></div>
         </div>
-        <button class="btn-reiniciar">Reiniciar</button>
+        <button class="btn-reiniciar" style="display:none;">Reiniciar</button>
         <button class="btn-sair">Sair</button>
         <div class="jogadores">
             <div class="jogador" id="jogador1">
                 <h2 class="titulo-jogador">Jogador 1</h2>
                 <h2 id="p1" class="nome-jogador">Aguardando...</h2>
                 <p class="nome">X</p>
+                <p class="contador">Vitórias: <span id="vitorias-p1">0</span> | Jogos: <span id="jogos-p1">0</span></p>
             </div>
             <br>
             <div class="jogador" id="jogador2">
                 <h2 class="titulo-jogador">Jogador 2</h2>
                 <h2 id="p2" class="nome-jogador">Aguardando...</h2>
                 <p class="nome">O</p>
+                <p class="contador">Vitórias: <span id="vitorias-p2">0</span> | Jogos: <span id="jogos-p2">0</span></p>
             </div>
         </div>
+        <div id="mensagem-erro" style="color: red;"></div>
     </div>
 
     <script>
@@ -45,6 +48,7 @@
         const socket = new WebSocket('ws://localhost:8080');
         const celulas = document.querySelectorAll('[data-cell]');
         const botao_reiniciar = document.querySelector('.btn-reiniciar');
+        const mensagemErro = document.getElementById('mensagem-erro');
         let id = null;
         let simbolo = null;
         let jogador_atual = null;
@@ -70,11 +74,18 @@
             if (dados.acao === 'avisoJogadorSaiu') {
                 const elemento = document.getElementById(dados.chaveJogador);
                 if (elemento) elemento.textContent = 'Aguardando...';
+                alert(`O jogador ${dados.chaveJogador} saiu!`);
+                const vitoriasElement = document.getElementById(`vitorias-${dados.chaveJogador}`);
+                const jogosElement = document.getElementById(`jogos-${dados.chaveJogador}`);
+                if (vitoriasElement && jogosElement) {
+                    vitoriasElement.textContent = '0';
+                    jogosElement.textContent = '0';
+                }
             }
 
             if (dados.acao === 'passarVez') {
                 jogador_atual = dados.jogador === 'Jogador 1' ? 'X' : 'O';
-                alert(`${dados.jogador} perdeu a conexão. Agora é sua vez!`);
+                mensagemErro.textContent = `Agora é a vez do Jogador ${dados.jogador === 'Jogador 1' ? '1 (X)' : '2 (O)'}`;
             }
 
             if (dados.acao === 'reiniciar') {
@@ -82,7 +93,9 @@
                     celula.textContent = '';
                     celula.classList.remove('marcado');
                 });
+                mensagemErro.textContent = '';
                 jogo_ativo = true;
+                botao_reiniciar.style.display = 'none';
             }
 
             if (dados.indice !== undefined && dados.jogador) {
@@ -106,7 +119,7 @@
             }
 
             if (dados.acao === 'fimDeJogo') {
-                alert(dados.mensagem);
+                alert(`${dados.nomeVencedor} venceu!`);
                 jogo_ativo = false;
                 botao_reiniciar.style.display = 'block';
             }
@@ -114,16 +127,24 @@
             if (dados.acao === 'ocultarBotao') {
                 botao_reiniciar.style.display = 'none';
             }
+
+            if (dados.acao === 'atualizarContadores') {
+                const vitoriasElement = document.getElementById(`vitorias-${dados.chaveJogador}`);
+                const jogosElement = document.getElementById(`jogos-${dados.chaveJogador}`);
+                if (vitoriasElement && jogosElement) {
+                    vitoriasElement.textContent = dados.vitorias;
+                    jogosElement.textContent = dados.jogos;
+                }
+            }
         });
 
         celulas.forEach((celula, indice) => {
             celula.addEventListener('click', () => {
-                if (celula.classList.contains('marcado') || !jogo_ativo) return;
-                if (simbolo !== jogador_atual) {
-                    alert("Não é sua vez!");
-                    return;
+                if (jogo_ativo && celula.textContent === '' && jogador_atual === simbolo) {
+                    socket.send(JSON.stringify({ acao: 'alterarJogada', indice }));
+                } else if (jogo_ativo && jogador_atual !== simbolo) {
+                    alert("Não é a sua vez!");
                 }
-                socket.send(JSON.stringify({ indice }));
             });
         });
 
@@ -133,11 +154,8 @@
 
         document.querySelector('.btn-sair').addEventListener('click', () => {
             socket.send(JSON.stringify({ acao: 'sair' }));
-            socket.close();
-            document.body.innerHTML = '<h1>Você saiu do jogo.</h1>';
+            window.location.href = '/';
         });
-
-        botao_reiniciar.style.display = 'none';
     </script>
 
 

@@ -9,8 +9,8 @@ const wss = new WebSocket.Server({ server });
 let turno_jogador = 'X';
 let tabuleiro = Array(9).fill(null);
 let lista_jogadores = {
-    'Jogador 1': { conexao: null, nome: 'Aguardando...' },
-    'Jogador 2': { conexao: null, nome: 'Aguardando...' }
+    'Jogador 1': { conexao: null, nome: 'Aguardando...', vitorias: 0, jogos: 0 },
+    'Jogador 2': { conexao: null, nome: 'Aguardando...', vitorias: 0, jogos: 0 }
 };
 
 function verificarVencedor() {
@@ -61,6 +61,7 @@ wss.on('connection', (conn) => {
     for (const id in lista_jogadores) {
         const chave_jogador = id === 'Jogador 1' ? 'p1' : 'p2';
         conn.send(JSON.stringify({ acao: 'atualizarNome', chaveJogador: chave_jogador, nome: lista_jogadores[id].nome }));
+        conn.send(JSON.stringify({ acao: 'atualizarContadores', chaveJogador: chave_jogador, vitorias: lista_jogadores[id].vitorias, jogos: lista_jogadores[id].jogos }));
     }
 
     conn.send(JSON.stringify({ acao: 'estadoAtual', tabuleiro, turnoJogador: turno_jogador }));
@@ -112,6 +113,23 @@ wss.on('connection', (conn) => {
                                 cliente.send(JSON.stringify({ acao: 'fimDeJogo', mensagem }));
                             }
                         });
+
+                        if (resultado !== 'Empate') {
+                            lista_jogadores[id_jogador].vitorias += 1;
+                        }
+                        lista_jogadores['Jogador 1'].jogos += 1;
+                        lista_jogadores['Jogador 2'].jogos += 1;
+
+                        wss.clients.forEach((cliente) => {
+                            if (cliente.readyState === WebSocket.OPEN) {
+                                wss.clients.forEach((cliente) => {
+                                    if (cliente.readyState === WebSocket.OPEN) {
+                                        cliente.send(JSON.stringify({ acao: 'atualizarContadores', chaveJogador: 'p1', vitorias: lista_jogadores['Jogador 1'].vitorias, jogos: lista_jogadores['Jogador 1'].jogos }));
+                                        cliente.send(JSON.stringify({ acao: 'atualizarContadores', chaveJogador: 'p2', vitorias: lista_jogadores['Jogador 2'].vitorias, jogos: lista_jogadores['Jogador 2'].jogos }));
+                                    }
+                                });
+                            }
+                        });
                     } else {
                         turno_jogador = turno_jogador === 'X' ? 'O' : 'X';
                         wss.clients.forEach((cliente) => {
@@ -129,6 +147,8 @@ wss.on('connection', (conn) => {
         if (id_jogador) {
             lista_jogadores[id_jogador].conexao = null;
             lista_jogadores[id_jogador].nome = 'Aguardando...';
+            lista_jogadores[id_jogador].vitorias = 0;
+            lista_jogadores[id_jogador].jogos = 0;
             const chave_jogador = id_jogador === 'Jogador 1' ? 'p1' : 'p2';
             wss.clients.forEach((cliente) => {
                 if (cliente.readyState === WebSocket.OPEN) {
