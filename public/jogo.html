@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="styles/padrao.css">
     <title>Jogo da Velha</title>
 </head>
+
 <body>
     <div class="jogo">
         <h1>Jogo da Velha</h1>
@@ -72,7 +74,7 @@
             if (dados.acao === 'avisoJogadorSaiu') {
                 const elemento = document.getElementById(dados.chaveJogador);
                 if (elemento) elemento.textContent = 'Aguardando...';
-                alert(`O jogador ${dados.chaveJogador} saiu!`);
+                alert(`O jogador ${dados.nomeJogador} saiu!`);
                 const vitoriasElement = document.getElementById(`vitorias-${dados.chaveJogador}`);
                 const jogosElement = document.getElementById(`jogos-${dados.chaveJogador}`);
                 if (vitoriasElement && jogosElement) {
@@ -80,6 +82,7 @@
                     jogosElement.textContent = '0';
                 }
             }
+
 
             if (dados.acao === 'passarVez') {
                 jogador_atual = dados.jogador === 'Jogador 1' ? 'X' : 'O';
@@ -160,4 +163,5 @@
         });
     </script>
 </body>
+
 </html>

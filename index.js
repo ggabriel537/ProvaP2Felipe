@@ -141,15 +141,13 @@ wss.on('connection', (conn) => {
 
     conn.on('close', () => {
         if (id_jogador) {
-            lista_jogadores[id_jogador].conexao = null;
-            lista_jogadores[id_jogador].nome = 'Aguardando...';
-            lista_jogadores[id_jogador].vitorias = 0;
-            lista_jogadores[id_jogador].jogos = 0;
+            const nomeAntigo = lista_jogadores[id_jogador].nome;
             const chave_jogador = id_jogador === 'Jogador 1' ? 'p1' : 'p2';
+
             wss.clients.forEach((cliente) => {
                 if (cliente.readyState === WebSocket.OPEN) {
                     cliente.send(JSON.stringify({ acao: 'atualizarNome', chaveJogador: chave_jogador, nome: 'Aguardando...' }));
-                    cliente.send(JSON.stringify({ acao: 'avisoJogadorSaiu', chaveJogador: chave_jogador }));
+                    cliente.send(JSON.stringify({ acao: 'avisoJogadorSaiu', chaveJogador: chave_jogador, nomeJogador: nomeAntigo }));
                     if (id_jogador === 'Jogador 1' && lista_jogadores['Jogador 2'].conexao) {
                         cliente.send(JSON.stringify({ acao: 'passarVez', jogador: 'Jogador 2' }));
                         turno_jogador = 'O';
@@ -159,6 +157,12 @@ wss.on('connection', (conn) => {
                     }
                 }
             });
+
+            lista_jogadores[id_jogador].conexao = null;
+            lista_jogadores[id_jogador].nome = 'Aguardando...';
+            lista_jogadores[id_jogador].vitorias = 0;
+            lista_jogadores[id_jogador].jogos = 0;
+
             tabuleiro = Array(9).fill(null);
             wss.clients.forEach((cliente) => {
                 if (cliente.readyState === WebSocket.OPEN) {
