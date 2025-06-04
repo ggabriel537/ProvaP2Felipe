@@ -39,7 +39,6 @@
                 <p class="contador">Vitórias: <span id="vitorias-p2">0</span> | Jogos: <span id="jogos-p2">0</span></p>
             </div>
         </div>
-        <div id="mensagem-erro" style="color: red;"></div>
     </div>
 
     <script>
@@ -48,13 +47,13 @@
         const socket = new WebSocket('ws://localhost:8080');
         const celulas = document.querySelectorAll('[data-cell]');
         const botao_reiniciar = document.querySelector('.btn-reiniciar');
-        const mensagemErro = document.getElementById('mensagem-erro');
         let id = null;
         let simbolo = null;
         let jogador_atual = null;
         let jogo_ativo = true;
 
         socket.addEventListener('open', () => {
+            // Envia o nome do usuário ao servidor
             socket.send(JSON.stringify({ acao: 'alterarNome', nome: nome_usuario }));
         });
 
@@ -62,21 +61,26 @@
             const dados = JSON.parse(event.data);
 
             if (dados.acao === 'atribuirNome') {
+                // Atribui o nome do jogador e o símbolo (X ou O)
                 id = dados.nome;
                 simbolo = id === 'Jogador 1' ? 'X' : 'O';
             }
 
             if (dados.acao === 'atualizarNome') {
+                // Atualiza o nome do jogador na interface
                 const elemento = document.getElementById(dados.chaveJogador);
                 if (elemento) elemento.textContent = dados.nome;
             }
 
             if (dados.acao === 'avisoJogadorSaiu') {
+                // Exibe um alerta se um jogador sair do jogo
                 const elemento = document.getElementById(dados.chaveJogador);
                 if (elemento) elemento.textContent = 'Aguardando...';
                 alert(`O jogador ${dados.nomeJogador} saiu!`);
-                const vitoriasElement = document.getElementById(`vitorias-${dados.chaveJogador}`);
-                const jogosElement = document.getElementById(`jogos-${dados.chaveJogador}`);
+                const vitoriasElement = document.getElementById(`vitorias-${dados.chaveJogador}`); 
+                // Reseta os contadores de vitórias e jogos
+                const jogosElement = document.getElementById(`jogos-${dados.chaveJogador}`); 
+                // Reseta os contadores de jogos
                 if (vitoriasElement && jogosElement) {
                     vitoriasElement.textContent = '0';
                     jogosElement.textContent = '0';
@@ -85,29 +89,32 @@
 
 
             if (dados.acao === 'passarVez') {
+                // Atualiza o jogador atual
                 jogador_atual = dados.jogador === 'Jogador 1' ? 'X' : 'O';
-                mensagemErro.textContent = `Agora é a vez do Jogador ${dados.jogador === 'Jogador 1' ? '1 (X)' : '2 (O)'}`;
             }
 
             if (dados.acao === 'reiniciar') {
+                // Reinicia o jogo
                 celulas.forEach(celula => {
                     celula.textContent = '';
-                    celula.classList.remove('marcado');
+                    celula.classList.remove('marcado'); // Remove a classe de marcado para todas as células
                 });
-                mensagemErro.textContent = '';
                 jogo_ativo = true;
                 botao_reiniciar.style.display = 'none';
             }
 
             if (dados.indice !== undefined && dados.jogador) {
+                // Atualiza a célula específica com o jogador que fez a jogada
                 const celula = celulas[dados.indice];
                 celula.textContent = dados.jogador;
                 celula.classList.add('marcado');
             }
 
             if (dados.acao === 'estadoAtual') {
+                // Atualiza o estado do jogo com base nos dados recebidos
                 dados.tabuleiro.forEach((valor, indice) => {
                     if (valor) {
+                        // Atualiza a célula com o valor do tabuleiro
                         celulas[indice].textContent = valor;
                         celulas[indice].classList.add('marcado');
                     }
@@ -116,38 +123,46 @@
             }
 
             if (dados.acao === 'atualizarTurno') {
+                // Atualiza o jogador atual com base no turno do jogador
                 jogador_atual = dados.turnoJogador;
             }
 
             if (dados.acao === 'fimDeJogo') {
+                // Exibe o resultado do jogo
                 if (dados.nomeVencedor === 'Empate') {
-                    alert('Jogo empatou!');
+                    alert('Jogo empatou!'); // Exibe mensagem de empate
                 } else {
-                    alert(`${dados.nomeVencedor} venceu!`);
+                    alert(`${dados.nomeVencedor} venceu!`); // Exibe mensagem de vitória
                 }
-                jogo_ativo = false;
+                jogo_ativo = false; // Desativa o jogo
                 botao_reiniciar.style.display = 'block';
             }
 
             if (dados.acao === 'ocultarBotao') {
+                // Oculta o botão de reiniciar
                 botao_reiniciar.style.display = 'none';
             }
 
             if (dados.acao === 'atualizarContadores') {
+                // Atualiza os contadores de vitórias e jogos para cada jogador
                 const vitoriasElement = document.getElementById(`vitorias-${dados.chaveJogador}`);
                 const jogosElement = document.getElementById(`jogos-${dados.chaveJogador}`);
                 if (vitoriasElement && jogosElement) {
                     vitoriasElement.textContent = dados.vitorias;
+                    // Pega a quantidade de vitorias e jogos do jogador e define no elemento HTML
                     jogosElement.textContent = dados.jogos;
                 }
             }
         });
 
         celulas.forEach((celula, indice) => {
+            // Adiciona um evento de clique a cada célula
             celula.addEventListener('click', () => {
                 if (jogo_ativo && celula.textContent === '' && jogador_atual === simbolo) {
+                    // Verifica se a célula está vazia e se é a vez do jogador atual
                     socket.send(JSON.stringify({ acao: 'alterarJogada', indice }));
                 } else if (jogo_ativo && jogador_atual !== simbolo) {
+                    // Se não for a vez do jogador atual, exibe um alerta
                     alert("Não é a sua vez!");
                 }
             });
